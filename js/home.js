@@ -238,19 +238,36 @@ $(function(){
         };
         var stop = {};
 
+        var target = $(event.target);
+        if(!target.is("li")){
+            target = target.parent("li");
+        }
+
         var isSwiping = false;
         var isScrolling = false;
         var isScrollUp = undefined;
+        var SCALE = 1;
+        var THRESHOLD = 100;
 
         var moveHandler = function() {
-            if(isSwiping){
-                event.preventDefault();
-                return;
-            }
             var _stop = {
                 time: (new Date()).getTime(),
                 coords: [event.touches[0].clientX, event.touches[0].clientY]
             };
+            if(isSwiping){
+                stop = _stop;
+                var offset = target.position();
+                target.offset({top:offset.top, left:((stop.coords[0] - start.coords[0]) * SCALE)});
+                if(start.coords[0] - stop.coords[0] > THRESHOLD){
+                    $("#post-list").css("background", "blue");
+                } else if(stop.coords[0] - start.coords[0] > THRESHOLD){
+                    $("#post-list").css("background", "green");
+                } else {
+                    $("#post-list").css("background", "none");
+                }
+                event.preventDefault();
+                return;
+            }
             if(stop.coords){
                 if((_stop.time - stop.time) < 50){
                     return;
@@ -280,13 +297,15 @@ $(function(){
             $('#post-list').unbind('touchmove', moveHandler);
             $('#post-list').unbind('touchend', stopHandler);
             if(isSwiping){
-                if(start.coords[0] - stop.coords[0] > 10){
+                if(start.coords[0] - stop.coords[0] > THRESHOLD){
                     console.log('swipeleft');
                     alert('swipeleft');
-                } else if(stop.coords[0] - start.coords[0] > 10){
+                } else if(stop.coords[0] - start.coords[0] > THRESHOLD){
                     console.log('swiperight');
                     alert('swiperight');
                 }
+                var offset = target.position();
+                target.offset({top:offset.top, left:0});
             } else {
                 if(isScrollUp === true){
                     page.timelinePage.showToolbar();
