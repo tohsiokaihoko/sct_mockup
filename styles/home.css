@@ -1,0 +1,11 @@
+@charset "UTF-8";
+
+#post-list {
+  overflow:hidden;
+}
+
+.ui-btn-inner /* button */
+{
+overflow: visible;
+white-space: normal;
+}

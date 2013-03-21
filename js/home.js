@@ -1,5 +1,8 @@
 $(function(){
     var Post = Backbone.Model.extend({
+        getText: function() {
+            return this.splitTags(this.get("text"));
+        },
         getTextShort: function() {
             var LENGTH = 30;
             var textShort = this.splitTags(this.get("text"));
@@ -32,12 +35,15 @@ $(function(){
             return this;
         },
         reset: function() {
-            $("#post-list").empty();
+            var list = $("#post-list");
+            list.empty();
+            this.head = $(this.templateHead()).appendTo(list);
+            this.tail = $(this.templateTail()).appendTo(list);
             this.loadDummy();
         },
         add: function(post) {
             var list = $("#post-list");
-            list.append(this.template({text: post.getTextShort(), id: post.get("id"), thumb: post.get("thumb"), name: post.get("name"), commentCount: post.getCommentCount(), likeCount: post.getLikeCount(), date: post.getDateStr()}));
+            this.tail.before(this.template({text: post.getTextShort(), id: post.get("id"), thumb: post.get("thumb"), name: post.get("name"), commentCount: post.getCommentCount(), likeCount: post.getLikeCount(), date: post.getDateStr()}));
         },
         template: _.template(
             "<li id='<%= id %>'>\n\
@@ -49,6 +55,52 @@ $(function(){
                 <span class='likeCount'>Like:<%= likeCount %></span>\n\
             </li>"
             ),
+        detail: function(target, post) {
+            var list = $("#post-list");
+
+            var newTarget = $(this.templateDetail({
+                    text: post.getText(), 
+                    id: post.get("id"), 
+                    thumb: post.get("thumb"), 
+                    name: post.get("name"), 
+                    commentCount: post.getCommentCount(), 
+                    likeCount: post.getLikeCount(), 
+                    date: post.getDateStr()
+                }));
+
+            target.after(newTarget);
+            $('#post-list').listview('refresh');
+            var targetHeight = newTarget.height();
+            newTarget.height(target.height());
+            newTarget.animate({ height: targetHeight});
+            target.remove();
+        },
+        templateDetail: _.template(
+            "<li id='<%= id %>' class='detail'>\n\
+                <img class='thumb' src='<%= thumb %>' />\n\
+                <span class='name'><%= name %></span>\n\
+                <span class='date'><%= date %></span>\n\
+                <span class='text'><%= text %></span>\n\
+                <span class='commentCount'>Comment:<%= commentCount %>\n\
+                <span class='likeCount'>Like:<%= likeCount %></span>\n\
+            </li>"
+            ),
+        templateNew: _.template(
+            "<li id='<%= id %>' class='new'>\n\
+                <img class='thumb' src='<%= thumb %>' />\n\
+                <span class='name'><%= name %></span>\n\
+                <span class='date'><%= date %></span>\n\
+                <span class='text'><%= text %></span>\n\
+                <span class='commentCount'>Comment:<%= commentCount %>\n\
+                <span class='likeCount'>Like:<%= likeCount %></span>\n\
+            </li>"
+            ),
+        templateHead: _.template(
+            "<li id='listHead'>&nbsp;</li>"
+            ),
+        templateTail: _.template(
+            "<li id='listTail'>loading...</li>"
+            ),
         loadMore: function() {
             console.log("timeline page loadMore");
             this.loadDummy();
@@ -58,6 +110,12 @@ $(function(){
                 for(var i in POAT_DATA) {
                     this.add(new Post(POAT_DATA[i]));
                 }
+            }
+            $('#post-list').listview('refresh');
+        },
+        replaceDetailDummy: function(target) {
+            if(typeof DUMMY_DATA_LOADED != "undefined" && DUMMY_DATA_LOADED){
+                this.detail(target, new Post(POAT_DATA[target.attr("id")-1]));
             }
             $('#post-list').listview('refresh');
         },
@@ -86,6 +144,10 @@ $(function(){
                 $( "#timelineHeader" ).fixedtoolbar( "show" );
                 $( "#timelineFooter" ).fixedtoolbar( "show" );
             }
+        },
+        showDetail: function(target) {
+            console.log("showDetail(" + target.attr("id") + ")");
+            this.replaceDetailDummy(target);
         }
     });
 
@@ -297,15 +359,23 @@ $(function(){
             $('#post-list').unbind('touchmove', moveHandler);
             $('#post-list').unbind('touchend', stopHandler);
             if(isSwiping){
-                if(start.coords[0] - stop.coords[0] > THRESHOLD){
-                    console.log('swipeleft');
-                    alert('swipeleft');
-                } else if(stop.coords[0] - start.coords[0] > THRESHOLD){
-                    console.log('swiperight');
-                    alert('swiperight');
-                }
                 var offset = target.position();
-                target.offset({top:offset.top, left:0});
+                if((offset.left * (-1)) > THRESHOLD){
+                    console.log('swipeleft');
+                    target.animate({ left: $('#post-list').width()*(-1) }, "", "", function(){
+                        $( '#timelineShare' ).popup( 'open', {transition:"slide"} );
+                        target.offset({top:offset.top, left:0});
+                    });
+                } else if(offset.left > THRESHOLD){
+                    console.log('swiperight');
+                    target.animate({ left: $('#post-list').width() }, "", "", function(){
+                        $( '#timelineReply' ).popup( 'open', {transition:"slide"} );
+                        target.offset({top:offset.top, left:0});
+                    });
+                } else {
+                    target.animate({ left: 0 });
+                    //target.offset({top:offset.top, left:0});
+                }
             } else {
                 if(isScrollUp === true){
                     page.timelinePage.showToolbar();
@@ -317,6 +387,59 @@ $(function(){
 
         $('#post-list').bind('touchmove', moveHandler);
         $('#post-list').bind('touchend', stopHandler);
-    }
+    };
     $('#post-list').bind('touchstart', swipeStart);
+
+    var tapStart = function(){
+        console.log("tapStart");
+        var _this = $(this);
+        var target = $(event.target);
+        if(!target.is("li")){
+            target = target.parent("li");
+        }
+        console.log(_this);
+        console.log(target);
+        if(_this.data("dblTap")){
+            _this.data("dblTap",false);
+            //ダブルタップ時の命令
+            console.log("doubletap");
+            alert('doubletap');
+        }else{
+            console.log("dblTap === false");
+            _this.data("dblTap",true);
+            setTimeout(function(){
+                console.log("timeout...");
+                if(_this.data("dblTap")){
+                    //タップ時の命令
+                    console.log("tap");
+                    page.timelinePage.showDetail(target);
+                }
+                _this.data("dblTap",false);
+            },500);
+        }
+    };
+    var doubletapStart = function(){
+        console.log("tapStart");
+        var _this = $(this);
+        var target = $(event.target);
+        if(!target.is("li")){
+            target = target.parent("li");
+        }
+        if(_this.data("dblTap")){
+            _this.data("dblTap",false);
+            //ダブルタップ時の命令
+            console.log("doubletap");
+            if(target.hasClass("detail")){
+                $.mobile.changePage("#timelineDetail");
+            } else {
+                page.timelinePage.showDetail(target);
+            }
+        }else{
+            _this.data("dblTap",true);
+        }
+        setTimeout(function(){
+            _this.data("dblTap",false);
+        },500);
+    };
+    $("#post-list").bind("tap", doubletapStart);
 });
